@@ -1,0 +1,62 @@
+const express = require('express');
+const router = express.Router();
+const User = require('../models/User'); // Assuming your user model is located here
+
+// Middleware to authenticate user session
+const authenticate = (req, res, next) => {
+    if (req.session.userId) {
+        next(); // User is authenticated, proceed to the next middleware
+    } else {
+        res.status(401).json({ message: "Unauthorized" }); // User is not authenticated
+    }
+};
+
+// Add a note to a specific user
+router.post('/:userId/notes', authenticate, async (req, res) => {
+    const { title, content } = req.body;
+    try {
+        const user = await User.findById(req.params.userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        user.notes.push({ title, content });
+        await user.save();
+        res.status(201).json(user.notes);
+    } catch (error) {
+        res.status(500).json({ message: "Error adding note", error: error.message });
+    }
+});
+
+// Retrieve all notes for a specific user
+router.get('/:userId/notes', authenticate, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        res.status(200).json(user.notes);
+    } catch (error) {
+        res.status(500).json({ message: "Error fetching notes", error: error.message });
+    }
+});
+
+// Delete a specific note for a user
+router.delete('/:userId/notes/:noteId', authenticate, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId);
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        const note = user.notes.id(req.params.noteId);
+        if (!note) {
+            return res.status(404).json({ message: "Note not found" });
+        }
+        note.remove();
+        await user.save();
+        res.status(200).json({ message: "Note deleted" });
+    } catch (error) {
+        res.status(500).json({ message: "Error deleting note", error: error.message });
+    }
+});
+
+module.exports = router;
